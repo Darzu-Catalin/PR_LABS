@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Client - Web Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #0f0f23;
+            color: #ffffff;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.7;
+            font-weight: 300;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            align-items: end;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.1);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .panel-header h3 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .file-list {
+            list-style: none;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .file-icon {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            width: 30px;
+            text-align: center;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 0.2rem;
+        }
+
+        .file-meta {
+            font-size: 0.85rem;
+            opacity: 0.6;
+        }
+
+        .response-area {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            min-height: 200px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .breadcrumb {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+            margin-right: 0.5rem;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+            opacity: 0.7;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #dc3545, #e83e8c);
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>HTTP Client</h1>
+            <p>Modern web interface for your HTTP file server</p>
+        </div>
+
+        <div class="control-panel">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="host">Server Host</label>
+                    <input type="text" id="host" value="localhost" placeholder="localhost">
+                </div>
+                <div class="form-group">
+                    <label for="port">Port</label>
+                    <input type="number" id="port" value="8080" placeholder="8080">
+                </div>
+                <button class="btn" onclick="connect()">Connect</button>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="path">Request Path</label>
+                    <input type="text" id="path" value="/" placeholder="/path/to/file">
+                </div>
+                <button class="btn secondary" onclick="makeRequest()">GET</button>
+                <button class="btn secondary" onclick="downloadFile()">Download</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📁 File Browser</h3>
+                </div>
+                <div class="panel-content">
+                    <div class="breadcrumb" id="breadcrumb">
+                        <a href="#" onclick="navigate('/')">/</a>
+                    </div>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>Loading...</p>
+                    </div>
+                    <ul class="file-list" id="fileList">
+                        <li class="file-item">
+                            <div class="file-icon">🔌</div>
+                            <div class="file-info">
+                                <div class="file-name">Connect to server to browse files</div>
+                                <div class="file-meta">Click Connect to get started</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📄 Response</h3>
+                </div>
+                <div class="panel-content">
+                    <div class="response-area" id="response">
+                        Response content will appear here...
+                        
+Make your first request to see server response.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div>
+                <span id="requestCount">Requests: 0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Helper function to right-strip characters
+        String.prototype.rstrip = function(chars) {
+            let regex = new RegExp(chars + '+$', 'g');
+            return this.replace(regex, '');
+        };
+
+        let currentPath = '/';
+        let requestCount = 0;
+        let isConnected = false;
+
+        function getServerUrl() {
+            const host = document.getElementById('host').value || 'localhost';
+            const port = document.getElementById('port').value || '8080';
+            return `http://${host}:${port}`;
+        }
+
+        function updateStatus(connected, message) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            isConnected = connected;
+            
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = message || 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = message || 'Disconnected';
+            }
+        }
+
+        function updateRequestCount() {
+            requestCount++;
+            document.getElementById('requestCount').textContent = `Requests: ${requestCount}`;
+        }
+
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.add('show');
+            } else {
+                loading.classList.remove('show');
+            }
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function connect() {
+            const serverUrl = getServerUrl();
+            showLoading(true);
+            
+            fetch(serverUrl + '/')
+                .then(response => {
+                    updateRequestCount();
+                    if (response.ok) {
+                        updateStatus(true, `Connected to ${serverUrl}`);
+                        navigate('/');
+                        showNotification('Connected successfully!');
+                        return response.text();
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                })
+                .catch(error => {
+                    updateStatus(false, `Connection failed`);
+                    showNotification(`Failed to connect: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function makeRequest() {
+            const path = document.getElementById('path').value || '/';
+            const serverUrl = getServerUrl();
+            
+            showLoading(true);
+            
+            fetch(serverUrl + path)
+                .then(response => {
+                    updateRequestCount();
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    let responseText = `Status: ${response.status} ${response.statusText}\n`;
+                    responseText += `Content-Type: ${contentType}\n`;
+                    responseText += `Content-Length: ${response.headers.get('content-length') || 'unknown'}\n\n`;
+                    
+                    if (contentType.includes('text/html')) {
+                        return response.text().then(text => {
+                            document.getElementById('response').textContent = responseText + text;
+                        });
+                    } else if (contentType.includes('application/json')) {
+                        return response.json().then(json => {
+                            document.getElementById('response').textContent = responseText + JSON.stringify(json, null, 2);
+                        });
+                    } else if (contentType.includes('text/')) {
+                        return response.text().then(text => {
+                            document.getElementById('response').textContent = responseText + text;
+                        });
+                    } else {
+                        document.getElementById('response').textContent = responseText + '[Binary content - use Download button to save file]';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('response').textContent = `Error: ${error.message}`;
+                    showNotification(`Request failed: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function downloadFile() {
+            const path = document.getElementById('path').value || '/';
+            const serverUrl = getServerUrl();
+            
+            showLoading(true);
+            
+            fetch(serverUrl + path)
+                .then(response => {
+                    updateRequestCount();
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const filename = path.split('/').pop() || 'download';
+                    
+                    return response.blob().then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        showNotification(`Downloaded: ${filename} (${formatBytes(blob.size)})`);
+                    });
+                })
+                .catch(error => {
+                    showNotification(`Download failed: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function navigate(path) {
+            currentPath = path;
+            document.getElementById('path').value = path;
+            updateBreadcrumb(path);
+            
+            if (path.endsWith('/')) {
+                fetchDirectory(path);
+            }
+        }
+
+        function updateBreadcrumb(path) {
+            const breadcrumb = document.getElementById('breadcrumb');
+            const parts = path.split('/').filter(part => part);
+            
+            let html = '<a href="#" onclick="navigate(\'/\')">/</a>';
+            let currentPath = '';
+            
+            parts.forEach((part, index) => {
+                currentPath += '/' + part;
+                const decodedPart = decodeURIComponent(part);
+                
+                if (index === parts.length - 1 && !path.endsWith('/')) {
+                    // Last part is a file, don't make it clickable
+                    html += `<span>${decodedPart}</span>`;
+                } else {
+                    // Directory part, make it clickable
+                    const targetPath = currentPath + (currentPath.endsWith('/') ? '' : '/');
+                    html += `<a href="#" onclick="navigate('${targetPath}')">${decodedPart}/</a>`;
+                }
+            });
+            
+            breadcrumb.innerHTML = html;
+        }
+
+        function fetchDirectory(path) {
+            const serverUrl = getServerUrl();
+            showLoading(true);
+            
+            fetch(serverUrl + path)
+                .then(response => {
+                    updateRequestCount();
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    parseDirectory(html, path);
+                })
+                .catch(error => {
+                    showNotification(`Failed to load directory: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function parseDirectory(html, basePath) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = doc.querySelectorAll('a[href]');
+            
+            // Add parent directory if not root
+            if (basePath !== '/') {
+                const parentParts = basePath.rstrip('/').split('/');
+                const parentPath = parentParts.length > 1 ? 
+                    '/' + parentParts.slice(1, -1).join('/') + (parentParts.length > 2 ? '/' : '') :
+                    '/';
+                const parentItem = createFileItem('⬆️', '.. (Parent Directory)', 'Directory', () => navigate(parentPath));
+                fileList.appendChild(parentItem);
+            }
+            
+            links.forEach(link => {
+                const href = link.getAttribute('href');
+                const text = link.textContent.trim();
+                
+                if (href && text && href !== '../' && href !== '..' && !href.startsWith('../')) {
+                    const isDirectory = href.endsWith('/');
+                    
+                    // Handle absolute vs relative paths
+                    let fullPath;
+                    if (href.startsWith('/')) {
+                        // Absolute path from server
+                        fullPath = href;
+                    } else {
+                        // Relative path - construct from current directory
+                        const cleanBasePath = basePath.endsWith('/') ? basePath : basePath + '/';
+                        fullPath = cleanBasePath + href;
+                    }
+                    
+                    const icon = isDirectory ? '📁' : getFileIcon(href);
+                    const type = isDirectory ? 'Directory' : getFileType(href);
+                    
+                    const item = createFileItem(icon, text, type, () => {
+                        if (isDirectory) {
+                            navigate(fullPath);
+                        } else {
+                            document.getElementById('path').value = fullPath;
+                        }
+                    });
+                    
+                    fileList.appendChild(item);
+                }
+            });
+        }
+
+        function createFileItem(icon, name, type, onClick) {
+            const li = document.createElement('li');
+            li.className = 'file-item';
+            li.onclick = onClick;
+            
+            li.innerHTML = `
+                <div class="file-icon">${icon}</div>
+                <div class="file-info">
+                    <div class="file-name">${name}</div>
+                    <div class="file-meta">${type}</div>
+                </div>
+            `;
+            
+            return li;
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.toLowerCase().split('.').pop();
+            const icons = {
+                'pdf': '📄',
+                'png': '🖼️',
+                'jpg': '🖼️',
+                'jpeg': '🖼️',
+                'gif': '🖼️',
+                'html': '🌐',
+                'htm': '🌐',
+                'txt': '📝',
+                'css': '🎨',
+                'js': '⚡',
+                'json': '📋'
+            };
+            return icons[ext] || '📄';
+        }
+
+        function getFileType(filename) {
+            const ext = filename.toLowerCase().split('.').pop();
+            const types = {
+                'pdf': 'PDF Document',
+                'png': 'PNG Image',
+                'jpg': 'JPEG Image',
+                'jpeg': 'JPEG Image',
+                'gif': 'GIF Image',
+                'html': 'HTML Document',
+                'htm': 'HTML Document',
+                'txt': 'Text File',
+                'css': 'CSS Stylesheet',
+                'js': 'JavaScript File',
+                'json': 'JSON Data'
+            };
+            return types[ext] || 'File';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Auto-connect on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                if (document.getElementById('host').value === 'localhost') {
+                    connect();
+                }
+            }, 500);
+        });
+
+        // Handle Enter key
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const target = e.target;
+                if (target.id === 'host' || target.id === 'port') {
+                    connect();
+                } else if (target.id === 'path') {
+                    makeRequest();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
