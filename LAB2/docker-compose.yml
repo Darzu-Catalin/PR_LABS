@@ -1,0 +1,10 @@
+services:
+  http-server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./content:/app/content:ro
+      - ./downloads:/app/downloads
+    container_name: http-file-server-lab2
+    restart: unless-stopped
