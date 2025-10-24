@@ -13,8 +13,6 @@ This lab extends the HTTP file server from Lab 1 with real concurrency:
 - Per-IP rate limiting (~5 req/s) implemented in a thread-safe way
 - Benchmark tooling to compare single-threaded vs concurrent performance
 
-The code lives in `LAB2/` and intentionally starts with empty `content/`, `downloads/`, and `screenshots/` directories so you can add your own test payloads and artifacts.
-
 ---
 
 ## Concurrency background (PLT vs OS)
@@ -155,10 +153,10 @@ Interpreting results:
 - Concurrent Lab 2 should compress total time toward delay × ceil(N / workers).
 - If you see 429s, increase `LAB2_RATE_LIMIT` during tests.
 
-Recommended report figures (add screenshots later):
-- `screenshots/bench_naive_vs_locked.png` — Comparison of total time under naive vs locked counter at the same concurrency.
-- `screenshots/bench_workers_sweep.png` — Sweep workers ∈ {1,2,4,8,16,32} at fixed requests, show speedup.
-- `screenshots/bench_rate_limit.png` — Throughput curve as you vary `LAB2_RATE_LIMIT`.
+Example run (bench-compare):
+
+![Concurrency benchmark summary](screenshots/concurrency-benchmark.png)
+<p align="center"><em>Figure: workers=1 vs workers=8 with 1s delay; concurrent case approaches delay × ceil(N/workers)</em></p>
 
 ---
 
@@ -183,6 +181,9 @@ LAB2_COUNTER_MODE=locked ./run.sh server
 
 Optional: capture a side-by-side listing showing non-monotonic increments under naive mode, then the corrected listing with locked mode.
 
+![Directory listing with Hits column](screenshots/dir-hits.png)
+<p align="center"><em>Figure: Hits column visible in directory listing; use naive vs locked modes to observe race vs correctness</em></p>
+
 ---
 
 ## Rate limiting demonstration
@@ -198,6 +199,9 @@ Optional: capture a side-by-side listing showing non-monotonic increments under 
 ```bash
 LAB2_RATE_LIMIT=20 LAB2_RATE_WINDOW=1.0 ./run.sh server
 ```
+
+![Rate limiting in action](screenshots/rate-limit.png)
+<p align="center"><em>Figure: High-concurrency burst triggers HTTP 429 Too Many Requests per-IP limiter</em></p>
 
 ---
 
@@ -224,18 +228,21 @@ Artifacts to include later:
 
 ---
 
-## Screenshots (placeholders)
+## Screenshots
 
-Add screenshots under `LAB2/screenshots/` and reference them here:
-- `screenshots/dir_hits.png` – Directory listing with “Hits” column
-- `screenshots/429_ratelimit.png` – Example of rate limiting in action
-- `screenshots/benchmark_results.png` – Terminal output comparing runs
+Below are the screenshots captured for this lab:
 
-```markdown
-![Directory hits](screenshots/dir_hits.png)
-![Rate limiting 429](screenshots/429_ratelimit.png)
-![Benchmark summary](screenshots/benchmark_results.png)
-```
+- Concurrency benchmark (bench-compare):
+
+	![Concurrency benchmark summary](screenshots/concurrency-benchmark.png)
+
+- Directory listing with Hits column:
+
+	![Directory listing with Hits column](screenshots/dir-hits.png)
+
+- Rate limiting error distribution (HTTP 429):
+
+	![Rate limiting in action](screenshots/rate-limit.png)
 
 ---
 
