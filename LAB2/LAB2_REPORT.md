@@ -188,20 +188,186 @@ Optional: capture a side-by-side listing showing non-monotonic increments under 
 
 ## Rate limiting demonstration
 
-1) Default limiter (~5 req/s per IP):
-- Spam with high concurrency; you’ll observe 429 responses once the rate exceeds the window.
+This section shows exactly how requests are spammed at a known rate, the resulting per-second success/denial statistics, and how the limiter is aware of client IPs.
 
-2) Compare behaviors:
-- One client spamming vs another just below the limit — the latter should see near-100% success throughput.
+### Code excerpt (server-side limiter)
 
-3) Tune the limiter during experiments:
+The limiter maintains a per-IP deque of timestamps. Each request removes timestamps older than the window and only accepts the request if fewer than `rate_limit` remain.
+
+```python
+# server.py (excerpt)
+from collections import defaultdict, deque
+self.rate_map: dict[str, deque] = defaultdict(deque)
+self.rate_lock = threading.Lock()
+
+def _check_rate_limit(self, ip: str) -> bool:
+	now = time.monotonic()
+	with self.rate_lock:
+		dq = self.rate_map[ip]
+		window_start = now - self.rate_window
+		while dq and dq[0] < window_start:
+			dq.popleft()
+		if len(dq) >= self.rate_limit:
+			return False
+		dq.append(now)
+		return True
+
+# In _handle_connection(...)
+ip = client_addr[0]
+if not self._check_rate_limit(ip):
+	self.send_response(client_socket, 429, "Too Many Requests", "text/plain", "Rate limit exceeded")
+	return
+```
+
+Configuration knobs: `--rate-limit N` and `--rate-window SECONDS` (defaults 5 and 1.0). This is O(1) amortized per request and thread-safe via a lock.
+
+### Tooling: request spammer with RPS control
+
+Added `src/rate_spammer.py` which schedules requests to hit a target requests/second and prints per-second status buckets:
+
+```bash
+# 50 requests/second for 5 seconds
+python3 src/rate_spammer.py http://localhost:8086/ --rps 50 --duration 5 --concurrency 50
+```
+
+Sample output against a strict 5 req/s limiter (port 8086):
+
+```
+Per-second stats:
+09:29:18  total= 14 | 200=  5  429=  9  other=  0  (rps≈14)
+09:29:19  total= 50 | 200=  5  429= 45  other=  0  (rps≈50)
+09:29:20  total= 50 | 200=  5  429= 45  other=  0  (rps≈50)
+09:29:21  total= 50 | 200=  5  429= 45  other=  0  (rps≈50)
+09:29:22  total= 50 | 200=  5  429= 45  other=  0  (rps≈50)
+09:29:23  total= 36 | 200=  0  429= 36  other=  0  (rps≈36)
+
+Summary:
+sent=250 in 5s  → achieved_rps≈50.0
+200 OK=25  429 TooMany=225  other=0
+```
+
+Interpretation: with a 5 req/s per-IP budget, roughly 5 requests each second succeed (HTTP 200) and the rest are denied (HTTP 429). Minor bucket-edge jitter is normal with concurrent senders.
+
+### IP-awareness demo (two different clients)
+
+We run the server in Docker (port 8080) and compare traffic from the host vs traffic from inside the container. The server sees different client IPs (host via the Docker bridge vs container localhost), thus it applies separate per-IP budgets.
+
+1) Start server in Docker:
+
+```bash
+docker compose up -d --build
+# Server at http://localhost:8080
+```
+
+2) From the host, spam at 50 RPS for 3 seconds:
+
+```bash
+python3 src/rate_spammer.py http://localhost:8080/ --rps 50 --duration 3 --concurrency 50
+```
+
+Example host output:
+
+```
+Per-second stats:
+09:32:45  total= 37 | 200=  5  429= 32  other=  0  (rps≈37)
+09:32:46  total= 50 | 200=  5  429= 45  other=  0  (rps≈50)
+09:32:47  total= 49 | 200=  5  429= 44  other=  0  (rps≈49)
+
+Summary:
+sent=150 in 3s  → achieved_rps≈50.0
+200 OK=15  429 TooMany=135  other=0
+```
+
+3) From inside the container (different client IP), send at or below the limit:
+
+```bash
+docker exec http-file-server-lab2 python3 src/rate_spammer.py http://127.0.0.1:8080/ --rps 5 --duration 3 --concurrency 5
+```
+
+Example container output (independent budget):
+
+```
+Per-second stats:
+…  total=  5 | 200=  5  429=  0  other=  0  (rps≈5)
+…  total=  5 | 200=  4  429=  1  other=  0  (rps≈5)
+…  total=  5 | 200=  4  429=  1  other=  0  (rps≈5)
+
+Summary:
+sent=15 in 3s  → achieved_rps≈5.0
+200 OK=13  429 TooMany=2  other=0
+```
+
+Because the limiter is per-IP, the container’s requests are admitted using its own budget, unaffected by the host’s spam. Occasional 429s at exactly 5 RPS can occur due to timing jitter; using 4 RPS will typically yield 100% 200 OK.
+
+Tuning the limiter during experiments:
 
 ```bash
 LAB2_RATE_LIMIT=20 LAB2_RATE_WINDOW=1.0 ./run.sh server
 ```
 
 ![Rate limiting in action](screenshots/rate-limit.png)
-<p align="center"><em>Figure: High-concurrency burst triggers HTTP 429 Too Many Requests per-IP limiter</em></p>
+<p align="center"><em>Figure: High-concurrency burst triggers HTTP 429 Too Many Requests; limiter tracks budgets per source IP</em></p>
+
+---
+
+## Hit counter and race condition
+
+This server counts requests per path and shows the total in the directory listing ("Hits" column). We purposely provide a naive mode that exhibits a race, and a locked mode that fixes it.
+
+### How to trigger the race
+
+Run the server in naive mode with an extra interleave sleep and a high rate limit (to avoid 429 while testing):
+
+```bash
+LAB2_COUNTER_MODE=naive \
+LAB2_NAIVE_INTERLEAVE_MS=20 \
+LAB2_RATE_LIMIT=1000 \
+LAB2_DELAY=0 \
+LAB2_WORKERS=8 \
+./run.sh server
+```
+
+Then hammer the same path with many concurrent requests:
+
+```bash
+# Option A: use the benchmark
+BENCH_URL=http://localhost:8080/ BENCH_CONCURRENCY=50 BENCH_REQUESTS=500 ./run.sh bench
+
+# Option B: quick curl burst
+seq 1 500 | xargs -I{} -P 50 curl -s -o /dev/null http://localhost:8080/
+```
+
+Open `http://localhost:8080/` in the browser (or `curl -s http://localhost:8080/`) and inspect the "Hits" column. You'll notice the total is smaller than the number of requests sent — increments were lost due to a race.
+
+Why this races (read-modify-write): two threads can read the same old value, both compute `old+1`, and one write overwrites the other.
+
+### Code responsible (excerpt, max 4 lines)
+
+Naive increment (race-prone):
+
+```python
+current = self.request_counts[path]
+time.sleep(self.naive_interleave_ms / 1000.0)
+self.request_counts[path] = current + 1
+```
+
+### Fixed code (locked increment)
+
+Make the increment a critical section to ensure atomicity:
+
+```python
+with self.count_lock:
+	self.request_counts[path] += 1
+```
+
+Re-run with locking enabled and repeat the load; the "Hits" count will match the number of requests:
+
+```bash
+LAB2_COUNTER_MODE=locked LAB2_RATE_LIMIT=1000 LAB2_DELAY=0 LAB2_WORKERS=8 ./run.sh server
+BENCH_URL=http://localhost:8080/ BENCH_CONCURRENCY=50 BENCH_REQUESTS=500 ./run.sh bench
+```
+
+You should no longer observe lost increments.
 
 ---
 
