@@ -22,9 +22,6 @@ const PlayerInfo: React.FC<PlayerInfoProps> = ({
         <button onClick={onRefresh} className="button">
           Refresh Board
         </button>
-        <button onClick={onDisconnect} className="button">
-          Disconnect
-        </button>
       </div>
     </div>
   );
