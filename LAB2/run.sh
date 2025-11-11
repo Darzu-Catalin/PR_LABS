@@ -14,6 +14,7 @@ show_usage() {
     echo "  docker-build  - Build and start with Docker Compose"
     echo "  client        - Run example client commands"
     echo "  bench         - Run concurrency benchmark (10 parallel requests)"
+    echo "  bench-compare - Start workers=1 vs workers=N servers and compare timings"
     echo "  clean         - Clean up Docker containers"
     echo ""
 }
@@ -69,6 +70,18 @@ bench() {
     python3 src/benchmark.py "$URL" --concurrency "$CONC" --requests "$REQS" --trials "$TRIALS" $CSV_ARG
 }
 
+bench_compare() {
+    local REQS="${BENCH_REQUESTS:-10}"
+    local CONC="${BENCH_CONCURRENCY:-10}"
+    local WORKERS="${BENCH_WORKERS:-8}"
+    local DELAY="${BENCH_DELAY:-1}"
+    local RLIM="${BENCH_RATE_LIMIT:-1000}"
+    local PORT1="${BENCH_PORT1:-8091}"
+    local PORTN="${BENCH_PORTN:-8092}"
+    echo "Compare: requests=$REQS concurrency=$CONC workers=$WORKERS delay=${DELAY}s ports=$PORT1/$PORTN"
+    python3 src/bench_compare.py --requests "$REQS" --concurrency "$CONC" --workers "$WORKERS" --delay "$DELAY" --rate-limit "$RLIM" --port1 "$PORT1" --portN "$PORTN"
+}
+
 clean_docker() {
     echo "Cleaning up Docker containers (LAB2)..."
     docker-compose down
@@ -81,6 +94,7 @@ case "${1:-}" in
     docker-build) build_docker ;;
     client) run_client ;;
     bench) bench ;;
+    bench-compare) bench_compare ;;
     clean) clean_docker ;;
     *) show_usage ;;
  esac
