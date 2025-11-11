@@ -10,6 +10,9 @@ RUN npm install
 COPY . .
 RUN npm run compile
 
+# Build React frontend to public/ directory
+RUN npm run build:frontend
+
 # Runtime image: install only production deps
 FROM node:22-bullseye-slim
 WORKDIR /app

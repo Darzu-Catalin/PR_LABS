@@ -1,0 +1,11 @@
+services:
+  # Backend server with React frontend
+  lab3_game:
+    build: .
+    image: lab3_game:latest
+    container_name: lab3_game
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production

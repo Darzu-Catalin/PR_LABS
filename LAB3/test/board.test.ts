@@ -41,21 +41,21 @@ describe('Board', function() {
     //   - notified when cards change value
     //   - multiple watchers
 
-    describe('parseFromFile() tests', function() {
+    describe('🎯 Board File Parsing Tests', function() {
         // Test valid boards
-        it('parses a valid board with same dimensions', async function() {
+        it('✅ Successfully loads a perfectly square game board', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
-            assert(board.look('player1').startsWith('4x4'));
+            assert(board.look('TestPlayer_Alpha').startsWith('4x4'));
         });
 
-        it('parses a valid board with different dimensions', async function() {
+        it('🔲 Handles rectangular board layouts correctly', async function() {
             const board = await Board.parseFromFile('boards/ab.txt');
-            assert(board.look('player1').startsWith('4x5'));
+            assert(board.look('TestPlayer_Beta').startsWith('4x5'));
         });
 
         
         // Test invalid boards
-        it('rejects empty board file', async function() {
+        it('❌ Properly rejects completely empty game files', async function() {
             await assert.rejects(
                 async () => await Board.parseFromFile('boards/invalid_empty.txt'),
                 (err) => {
@@ -66,7 +66,7 @@ describe('Board', function() {
             );
         });
 
-        it('rejects invalid board dimensions', async function() {
+        it('⚠️ Catches odd-numbered card configurations', async function() {
             await assert.rejects(
                 async () => await Board.parseFromFile('boards/invalid_dimensions.txt'),
                 (err) => {
@@ -103,33 +103,33 @@ describe('Board', function() {
         });
     });
 
-    describe('look() tests', function() {
+    describe('👀 Board Viewing & State Tests', function() {
         // Test board with no face-up cards
-        it('shows all cards face down initially', async function() {
+        it('🔒 Displays pristine game board with all cards hidden', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
-            const view = board.look('player1');
+            const view = board.look('GameMaster_001');
             const lines = view.split('\n');
-            assert(lines[0] === '4x4', 'Should show correct dimensions');
+            assert(lines[0] === '4x4', 'Game grid dimensions must be accurate');
             
             const cardLines = lines.slice(1);
             assert(cardLines.every(line => line === 'down'), 
-                'All cards should be face down initially');
+                'Fresh game board should have zero revealed cards');
         });
 
         // Test board with face-up cards controlled by viewer
-        it('shows my cards when controlled by viewer', async function() {
+        it('🎮 Highlights player-controlled cards with ownership markers', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
-            await board.flip('player1', 0, 0);
-            const view = board.look('player1');
+            await board.flip('Champion_X', 0, 0);
+            const view = board.look('Champion_X');
             const lines = view.split('\n');
             
-            // Should find exactly one face-up card controlled by player1
+            // Should find exactly one face-up card controlled by Champion_X
             const myCards = lines.filter(line => line.startsWith('my'));
-            assert.strictEqual(myCards.length, 1, 'Should see one card controlled by me');
+            assert.strictEqual(myCards.length, 1, 'Player should own exactly one revealed card');
             const myCard = myCards[0];
-            assert(myCard, 'Should have a card controlled by me');
+            assert(myCard, 'Controlled card must be visible in game state');
             assert(myCard.includes('🦄') || myCard.includes('🌈'), 
-                'Should show the actual card value');
+                'Card content should display magical creatures');
         });
 
         // Test board with face-up cards controlled by others
@@ -162,17 +162,17 @@ describe('Board', function() {
         });
     });
 
-    describe('flip() tests', function() {
+    describe('🃏 Card Flipping Mechanics', function() {
         // Test first card flip: valid position, uncontrolled card - rule 1-B, 1-C
-        it('allows flipping an uncontrolled card as first card', async function() {
+        it('🎯 Executes clean first-card reveal with instant ownership', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
-            const result = await board.flip('player1', 0, 0);
+            const result = await board.flip('Strategist_001', 0, 0);
             const lines = result.split('\n');
             const firstCard = lines[1];  // First card should be the one we flipped
-            assert(firstCard, 'Should have a first card in result');
-            assert(firstCard.startsWith('my'), 'First flipped card should be controlled by player');
+            assert(firstCard, 'Initial card flip must generate valid result');
+            assert(firstCard.startsWith('my'), 'Revealed card gains immediate player ownership');
             assert(firstCard.includes('🦄') || firstCard.includes('🌈'), 
-                'Should show the card value');
+                'Card must reveal enchanted creature symbols');
         });
 
         // Test first card flip: card controlled by others (should wait) - rule 1-D
@@ -222,29 +222,29 @@ describe('Board', function() {
         });
 
         // Test second card flip: matching pair
-        it('handles matching pair correctly', async function() {
+        it('🎉 Celebrates successful pair matches with dual ownership', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
             
             // Flip first card
-            const firstResult = await board.flip('player1', 0, 0);
+            const firstResult = await board.flip('MatchMaker_Pro', 0, 0);
             const lines = firstResult.split('\n');
             const firstCard = lines[1];
-            assert(firstCard, 'Should have first card');
+            assert(firstCard, 'Primary card flip must succeed');
             const firstCardValue = firstCard.split(' ')[1];
-            assert(firstCardValue, 'Should have card value');
+            assert(firstCardValue, 'Card must contain readable symbol value');
             
             // Find and flip matching card
             for (let i = 0; i < 4; i++) {
                 for (let j = 0; j < 4; j++) {
                     if (i === 0 && j === 0) continue;  // Skip the first card
                     try {
-                        const result = await board.flip('player1', i, j);
+                        const result = await board.flip('MatchMaker_Pro', i, j);
                         if (result.includes(firstCardValue)) {
                             // Found matching card, verify both are controlled
                             const resultLines = result.split('\n').slice(1);
                             const myCards = resultLines.filter(line => line.startsWith('my'));
                             assert.strictEqual(myCards.length, 2, 
-                                'Both cards should be controlled after match');
+                                'Perfect match grants control of both magical cards');
                             return;
                         }
                     } catch (e) {
@@ -253,7 +253,7 @@ describe('Board', function() {
                     }
                 }
             }
-            assert.fail('Should have found a matching pair');
+            assert.fail('Matching pair discovery should be guaranteed in perfect board');
         });
 
         // Test second card flip: non-matching pair
@@ -435,22 +435,22 @@ describe('Board', function() {
         });
     });
 
-    describe('watch() tests', function() {
+    describe('👁️ Real-time Board Monitoring System', function() {
         // Test notification when cards flip
-        it('notifies when cards are flipped', async function() {
+        it('🚨 Instantly alerts observers to card reveal events', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
             
             // Start watching
-            const watchPromise = board.watch('watcher');
+            const watchPromise = board.watch('GameObserver_Alpha');
             
             // Flip a card
             setTimeout(async () => {
-                await board.flip('player1', 0, 0);
+                await board.flip('ActivePlayer_001', 0, 0);
             }, 100);
             
             const result = await watchPromise;
             assert(result.includes('up') || result.includes('my'), 
-                   'Watch should detect card flip state change');
+                   'Real-time monitoring must capture card state transitions');
         });
 
         // Test notification when cards are removed
@@ -496,27 +496,27 @@ describe('Board', function() {
         });
 
         // Test multiple watchers
-        it('notifies multiple watchers', async function() {
+        it('📡 Broadcasts synchronized updates to all surveillance agents', async function() {
             const board = await Board.parseFromFile('boards/perfect.txt');
             
             // Start multiple watchers
-            const watchPromise1 = board.watch('watcher1');
-            const watchPromise2 = board.watch('watcher2');
+            const watchPromise1 = board.watch('SurveillanceBot_X');
+            const watchPromise2 = board.watch('MonitorDrone_Z');
             
             // Make a change
             setTimeout(async () => {
-                await board.flip('player1', 0, 0);
+                await board.flip('TriggerAgent_001', 0, 0);
             }, 100);
             
             // Wait for both notifications
             const [result1, result2] = await Promise.all([watchPromise1, watchPromise2]);
             
             assert(result1.includes('up') || result1.includes('my'), 
-                   'First watcher should be notified of change');
+                   'Primary surveillance unit must detect activity');
             assert(result2.includes('up') || result2.includes('my'), 
-                   'Second watcher should be notified of change');
+                   'Secondary monitor drone must capture identical event');
             assert.deepStrictEqual(result1, result2, 
-                   'Both watchers should receive the same board state');
+                   'All surveillance agents receive synchronized intelligence');
         });
     });
 });

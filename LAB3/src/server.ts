@@ -4,7 +4,7 @@ import { Server } from 'node:http';
 import express, { Application } from 'express';
 import { StatusCodes }  from 'http-status-codes';
 import { Board } from './board.js';
-import { look, flip, map, watch } from './commands.js';
+import { look, flip, map, watch, reset } from './commands.js';
 
 /**
  * Start a game server using the given arguments.
@@ -151,6 +151,26 @@ class WebServer {
             assert(playerId);
 
             const boardState = await watch(this.board, playerId);
+            response
+            .status(StatusCodes.OK) // 200
+            .type('text')
+            .send(boardState);
+        });
+
+        /*
+         * GET /reset/<playerId>
+         * playerId must be a nonempty string of alphanumeric or underscore characters
+         * 
+         * Resets the board to its initial state: all cards face down and no controllers.
+         * 
+         * Response is the state of the board after reset from the perspective of playerID,
+         * as described in the ps4 handout.
+         */
+        this.app.get('/reset/:playerId', async(request, response) => {
+            const { playerId } = request.params;
+            assert(playerId);
+
+            const boardState = await reset(this.board, playerId);
             response
             .status(StatusCodes.OK) // 200
             .type('text')

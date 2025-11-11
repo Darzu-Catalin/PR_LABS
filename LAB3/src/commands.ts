@@ -53,3 +53,14 @@ export async function map(board: Board, playerId: string, f: (card: string) => P
 export async function watch(board: Board, playerId: string): Promise<string> {
   return board.watch(playerId);
 }
+
+/**
+ * Resets the board to its initial state.
+ *
+ * @param board a Memory Scramble board
+ * @param playerId ID of player requesting the reset
+ * @returns the state of the board after reset
+ */
+export async function reset(board: Board, playerId: string): Promise<string> {
+  return board.reset(playerId);
+}
