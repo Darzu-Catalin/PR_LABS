@@ -3,6 +3,7 @@ import GameBoard from './components/GameBoard';
 import ConnectionForm from './components/ConnectionForm';
 import PlayerInfo from './components/PlayerInfo';
 import ResetBoard from './components/ResetBoard';
+import ReplaceCard from './components/ReplaceCard';
 import Snackbar, { SnackbarMessage } from './components/Snackbar';
 import { parseBoard, CardState } from './utils/boardParser';
 
@@ -266,6 +267,35 @@ const App: React.FC = () => {
     }
   }, [state.connected, state.playerId, apiCall, updateStatus, addSnackbar]);
 
+  const replaceCard = useCallback(async (fromCard: string, toCard: string) => {
+    if (!state.connected) {
+      addSnackbar('Not connected to server', 'error');
+      return;
+    }
+
+    try {
+      updateStatus(`Replacing ${fromCard} with ${toCard}...`, null);
+      
+      const boardData = await apiCall(`/replace/${encodeURIComponent(state.playerId)}/${encodeURIComponent(fromCard)}/${encodeURIComponent(toCard)}`);
+      const { board, dimensions } = parseBoard(boardData);
+      
+      setState(prev => ({
+        ...prev,
+        board,
+        dimensions,
+        status: `Replaced all ${fromCard} with ${toCard}`,
+        error: null,
+        lastRefresh: Date.now(),
+      }));
+      
+      addSnackbar(`Successfully replaced all "${fromCard}" cards with "${toCard}"`, 'success', 3000);
+      
+    } catch (error) {
+      updateStatus('Failed to replace cards', error instanceof Error ? error.message : 'Unknown error');
+      addSnackbar('Failed to replace cards. Please try again.', 'error');
+    }
+  }, [state.connected, state.playerId, apiCall, updateStatus, addSnackbar]);
+
   const switchMode = useCallback(() => {
     const newMode = state.mode === 'watch' ? 'polling' : 'watch';
     setState(prev => ({ ...prev, mode: newMode }));
@@ -356,6 +386,11 @@ const App: React.FC = () => {
               waitingForCard={state.waitingForCard}
             />
           )}
+          
+          <ReplaceCard 
+            onReplace={replaceCard}
+            disabled={!state.connected}
+          />
           
           <ResetBoard 
             onReset={resetBoard}
