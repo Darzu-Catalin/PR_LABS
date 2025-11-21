@@ -430,20 +430,21 @@ export class Board {
 
         const cell = this.getCell(row, column);
 
+        // Special handling for 'none' cards: allow them to trigger cleanup and return board state
         if (cell === undefined || cell.card.length === 0) {
-            // Rule 1-A and 2-A: No card there
+            // If this is after the first card flip, clean up and return
             if (state.firstCard) {
-                // Release control of first card if this was second flip
                 const firstCard = this.board[state.firstCard.row]?.[state.firstCard.col];
                 if (firstCard) {
                     firstCard.controller = undefined;
                     state.secondCard = Board.noneCard;
-                    // Wake any waiters after releasing control so they can proceed
                     this.notifyAll();
                 }
-
             }
-            throw new Error('invalid card position');
+            // Return current board state instead of throwing error for 'none' cards
+            const out = this.look(playerId);
+            this.checkRepFunctions();
+            return out;
         }
         
 

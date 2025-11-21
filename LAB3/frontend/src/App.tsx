@@ -17,6 +17,8 @@ interface AppState {
   isWatching: boolean;
   lastRefresh: number;
   snackbars: SnackbarMessage[];
+  mode: 'watch' | 'polling';
+  waitingForCard: { row: number; col: number } | null;
 }
 
 const App: React.FC = () => {
@@ -31,6 +33,8 @@ const App: React.FC = () => {
     isWatching: false,
     lastRefresh: 0,
     snackbars: [],
+    mode: 'polling',
+    waitingForCard: null,
   });
 
   const updateStatus = useCallback((status: string, error: string | null = null) => {
@@ -112,9 +116,15 @@ const App: React.FC = () => {
 
   const flipCard = useCallback(async (row: number, col: number) => {
     try {
+      // Set waiting state for this card
+      setState(prev => ({ ...prev, waitingForCard: { row, col } }));
       updateStatus('Flipping card...', null);
+      
       const boardData = await apiCall(`/flip/${encodeURIComponent(state.playerId)}/${row},${col}`);
       const { board, dimensions } = parseBoard(boardData);
+      
+      // Clear waiting state on success
+      setState(prev => ({ ...prev, waitingForCard: null }));
       
       // Check if it's a match by looking for face-up cards (status 'up' or 'my')
       const faceUpCards = board.flat().filter(card => card.status === 'up' || card.status === 'my');
@@ -140,9 +150,17 @@ const App: React.FC = () => {
         error: null,
       }));
     } catch (error) {
-      updateStatus('Failed to flip card', error instanceof Error ? error.message : 'Unknown error');
+      // Clear waiting state on error
+      setState(prev => ({ ...prev, waitingForCard: null }));
+      
+      if (error instanceof Error && error.message.includes('409')) {
+        addSnackbar('Waiting for card to become available...', 'warning', 3000);
+        updateStatus('Card is in use, waiting...', null);
+      } else {
+        updateStatus('Failed to flip card', error instanceof Error ? error.message : 'Unknown error');
+      }
     }
-  }, [apiCall, state.playerId, updateStatus]);
+  }, [apiCall, state.playerId, updateStatus, addSnackbar]);
 
 
 
@@ -170,7 +188,7 @@ const App: React.FC = () => {
     }
   }, [apiCall, state.playerId, state.connected, state.isWatching, updateStatus]);
 
-  const connect = useCallback(async (serverUrl: string, playerId: string) => {
+  const connect = useCallback(async (serverUrl: string, playerId: string, mode: 'watch' | 'polling') => {
     if (!serverUrl.trim() || !playerId.trim()) {
       updateStatus('', 'Server URL and Player ID are required');
       addSnackbar('Please enter both server URL and player ID', 'warning');
@@ -184,6 +202,7 @@ const App: React.FC = () => {
       serverUrl: cleanUrl,
       playerId: playerId.trim(),
       connected: false,
+      mode,
     }));
 
     try {
@@ -200,14 +219,15 @@ const App: React.FC = () => {
       const boardData = await response.text();
       const { board, dimensions } = parseBoard(boardData);
       
-      addSnackbar(`Welcome ${playerId.trim()}! Connected to game.`, 'success');
+      const modeText = mode === 'watch' ? 'Watch mode: Real-time updates' : 'Polling mode: Auto-refresh every 2s';
+      addSnackbar(`Welcome ${playerId.trim()}! Connected to game. ${modeText}`, 'success', 5000);
       
       setState(prev => ({
         ...prev,
         connected: true,
         board,
         dimensions,
-        status: 'Connected successfully!',
+        status: `Connected successfully! Mode: ${mode}`,
         error: null,
       }));
     } catch (error) {
@@ -246,6 +266,13 @@ const App: React.FC = () => {
     }
   }, [state.connected, state.playerId, apiCall, updateStatus, addSnackbar]);
 
+  const switchMode = useCallback(() => {
+    const newMode = state.mode === 'watch' ? 'polling' : 'watch';
+    setState(prev => ({ ...prev, mode: newMode }));
+    const modeText = newMode === 'watch' ? 'Watch mode: Real-time updates' : 'Polling mode: Auto-refresh every 2s';
+    addSnackbar(`Switched to ${modeText}`, 'info');
+  }, [state.mode, addSnackbar]);
+
   const disconnect = useCallback(() => {
     addSnackbar('Disconnected from server', 'info');
     setState({
@@ -259,22 +286,22 @@ const App: React.FC = () => {
       isWatching: false,
       lastRefresh: 0,
       snackbars: [],
+      mode: 'polling',
+      waitingForCard: null,
     });
   }, [addSnackbar]);
 
-  // Continuous auto-refresh for real-time board updates
+  // Polling mode: auto-refresh for real-time board updates
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
     
-    if (state.connected) {
+    if (state.connected && state.mode === 'polling') {
       // Initial board load
-      lookAtBoard();
+      lookAtBoard(true);
       
       // Set up continuous refresh every 2 seconds
       intervalId = setInterval(() => {
-        if (!state.isWatching) {
-          lookAtBoard();
-        }
+        lookAtBoard(true);
       }, 2000);
     }
     
@@ -283,15 +310,14 @@ const App: React.FC = () => {
         clearInterval(intervalId);
       }
     };
-  }, [state.connected, lookAtBoard, state.isWatching]);
+  }, [state.connected, state.mode, lookAtBoard]);
 
-  // Also watch for real-time changes using the watch endpoint
+  // Watch mode: use watch endpoint for real-time changes
   useEffect(() => {
-    if (state.connected && !state.isWatching) {
-      const timer = setTimeout(watchForChanges, 500);
-      return () => clearTimeout(timer);
+    if (state.connected && state.mode === 'watch' && !state.isWatching) {
+      watchForChanges();
     }
-  }, [state.connected, state.isWatching, watchForChanges]);
+  }, [state.connected, state.mode, state.isWatching, watchForChanges]);
 
   return (
     <div className="app">
@@ -304,6 +330,16 @@ const App: React.FC = () => {
         <ConnectionForm onConnect={connect} />
       ) : (
         <>
+          <div className={`mode-indicator ${state.isWatching ? 'watching' : ''}`}>
+            <span className={`mode-badge ${state.isWatching ? 'waiting' : ''}`}>
+              {state.isWatching && '⏳ '}
+              {state.mode === 'watch' ? '👁️ Watch Mode' : '🔄 Polling Mode'}
+              {state.isWatching && ' - Waiting for changes...'}
+            </span>
+            <button className="button button-switch-mode" onClick={switchMode}>
+              Switch to {state.mode === 'watch' ? 'Polling' : 'Watch'}
+            </button>
+          </div>
           <PlayerInfo 
             playerId={state.playerId}
             serverUrl={state.serverUrl}
@@ -317,6 +353,7 @@ const App: React.FC = () => {
               dimensions={state.dimensions}
               onCardClick={flipCard}
               currentPlayerId={state.playerId}
+              waitingForCard={state.waitingForCard}
             />
           )}
           

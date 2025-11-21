@@ -6,9 +6,10 @@ interface GameBoardProps {
   dimensions: { height: number; width: number };
   onCardClick: (row: number, col: number) => void;
   currentPlayerId: string;
+  waitingForCard: { row: number; col: number } | null;
 }
 
-const GameBoard: React.FC<GameBoardProps> = ({ board, dimensions, onCardClick, currentPlayerId }) => {
+const GameBoard: React.FC<GameBoardProps> = ({ board, dimensions, onCardClick, currentPlayerId, waitingForCard }) => {
   // Array of player colors for different players
   const playerColors = ['player-1', 'player-2', 'player-3', 'player-4'];
   const playerList = ['alice', 'bob', 'charlie', 'david', 'eve', 'frank', 'grace', 'henry'];
@@ -26,29 +27,44 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, dimensions, onCardClick, c
     return playerColors[Math.abs(hash) % playerColors.length];
   };
 
-  const getCardClass = (card: CardState): string => {
+  const getCardClass = (card: CardState, row: number, col: number): string => {
     const baseClass = 'card';
+    
+    // Check if this card is being waited for
+    const isWaiting = waitingForCard && waitingForCard.row === row && waitingForCard.col === col;
+    
+    let statusClass = '';
     switch (card.status) {
       case 'down':
-        return `${baseClass} face-down`;
+        statusClass = 'face-down';
+        break;
       case 'my':
-        return `${baseClass} my-card`;
+        statusClass = 'my-card';
+        break;
       case 'up':
-        // Use different colors for different players
+        // Distinguish between controlled and uncontrolled face-up cards
         if (card.text && card.text.includes('(')) {
-          // Extract player info from card text if available
+          // Card is controlled by another player - use player color
           const playerMatch = card.text.match(/\(([^)]+)\)/);
           if (playerMatch) {
             const otherPlayer = playerMatch[1];
-            return `${baseClass} other-card ${getPlayerColorClass(otherPlayer)}`;
+            statusClass = `other-card ${getPlayerColorClass(otherPlayer)}`;
+          } else {
+            statusClass = 'other-card';
           }
+        } else {
+          // Card is face-up but not controlled by anyone - use uncontrolled style
+          statusClass = 'uncontrolled-card';
         }
-        return `${baseClass} other-card`;
+        break;
       case 'none':
-        return `${baseClass} removed`;
+        statusClass = 'none';
+        break;
       default:
-        return baseClass;
+        statusClass = '';
     }
+    
+    return `${baseClass} ${statusClass} ${isWaiting ? 'waiting-for-card' : ''}`.trim();
   };
 
   const getCardContent = (card: CardState): string => {
@@ -56,13 +72,12 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, dimensions, onCardClick, c
   };
 
   const isCardClickable = (card: CardState): boolean => {
-    return card.status !== 'none';
+    // All cards are now clickable, including 'none' cards
+    return true;
   };
 
   const handleCardClick = (row: number, col: number, card: CardState) => {
-    if (isCardClickable(card)) {
-      onCardClick(row, col);
-    }
+    onCardClick(row, col);
   };
 
   return (
@@ -77,7 +92,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, dimensions, onCardClick, c
           row.map((card, colIndex) => (
             <div
               key={`${rowIndex}-${colIndex}`}
-              className={getCardClass(card)}
+              className={getCardClass(card, rowIndex, colIndex)}
               onClick={() => handleCardClick(rowIndex, colIndex, card)}
               style={{ cursor: isCardClickable(card) ? 'pointer' : 'not-allowed' }}
             >
