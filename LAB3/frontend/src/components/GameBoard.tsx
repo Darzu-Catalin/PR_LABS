@@ -68,7 +68,12 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, dimensions, onCardClick, c
   };
 
   const getCardContent = (card: CardState): string => {
-    return card.status === 'down' || card.status === 'none' ? '?' : card.text;
+    if (card.status === 'down' || card.status === 'none') {
+      return '?';
+    }
+    // Remove player ID in parentheses from display
+    const text = card.text.replace(/\s*\([^)]+\)\s*$/, '');
+    return text;
   };
 
   const isCardClickable = (card: CardState): boolean => {

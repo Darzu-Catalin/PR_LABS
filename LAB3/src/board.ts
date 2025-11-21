@@ -36,6 +36,7 @@ enum GameConstants {
 export class Board {
     private readonly dimensions: BoardDimensions;
     private readonly board: CardCell[][];
+    private readonly originalCards: string[][]; // Store original card layout
     private readonly playerStates: Map<string, PlayerState> = new Map();
     private readonly listeners: ((gameState: string) => void)[] = [];
     private readonly claimLocks: Map<string, string> = new Map();
@@ -79,6 +80,8 @@ export class Board {
      */
     private constructor(height: number, width: number, cards: string[][]) {
         this.dimensions = { height, width };
+        // Deep copy the original cards layout
+        this.originalCards = cards.map(row => [...row]);
         this.board = this.initializeBoard(cards);
         this.checkRep();
     }
@@ -390,6 +393,10 @@ export class Board {
             } else {
             status = "up";
             text = cell.card;
+            // Include controller info if card is controlled by another player
+            if (cell.controller !== undefined && cell.controller !== playerId) {
+                text += ` (${cell.controller})`;
+            }
             }
             lines.push(`${status} ${text}`.trim());
         }
@@ -621,17 +628,20 @@ export class Board {
 
     /**
      * Resets the board to its initial state: all cards face down, no controllers, 
-     * and clears all player states.
+     * and clears all player states. This restores all removed cards to their original positions.
      *
      * @param playerId ID of player requesting the reset; 
      *                 must be a nonempty string of alphanumeric or underscore characters
      * @returns the state of the board after reset from the perspective of playerId
      */
     public async reset(playerId: string): Promise<string> {
-        // Reset all cards to face down and remove controllers
-        for (const row of this.board) {
-            for (const cell of row) {
-                if (cell.card.length > 0) { // Only reset existing cards, don't restore removed cards
+        // Restore all cards to their original state
+        for (let i = 0; i < this.height; i++) {
+            for (let j = 0; j < this.width; j++) {
+                const cell = this.board[i]?.[j];
+                if (cell) {
+                    // Restore the original card value
+                    cell.card = this.originalCards[i]?.[j] ?? '';
                     cell.faceUp = false;
                     cell.controller = undefined;
                 }
