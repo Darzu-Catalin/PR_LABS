@@ -1,4 +1,6 @@
 import os
+import signal
+import sys
 import time
 import random
 import requests
@@ -169,5 +171,13 @@ def health():
     return jsonify({"status": "healthy", "role": "leader"}), 200
 
 
+def signal_handler(sig, frame):
+    """Handle shutdown signals gracefully."""
+    logger.info("Leader shutting down...")
+    sys.exit(0)
+
+
 if __name__ == '__main__':
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
     app.run(host='0.0.0.0', port=PORT, threaded=True)
